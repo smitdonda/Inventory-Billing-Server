@@ -1,0 +1,11 @@
+{
+  "apps": [
+    {
+      "name": "Back end server",
+      "script": "app.js",
+      "instances": 1,
+      "node_args": "--expose-gc --inspect --inspect-port=9229 --max-old-space-size=1024",
+      "exec_mode": "fork"
+    }
+  ]
+}
