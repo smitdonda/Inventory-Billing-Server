@@ -1,62 +1,61 @@
-var express = require("express");
+const express = require("express");
 const { ObjectId } = require("mongodb");
-var router = express.Router();
-var { mongodb, MongoClient, dburl } = require("../dbSchema");
-var {
-  hashPassword,
-  hashCompare,
-  createToken,
-  verifyToken,
-} = require("../auth");
+const router = express.Router();
+const { MongoClient, dburl } = require("../dbSchema");
+const { hashPassword, hashCompare, createToken, verifyToken } = require("../auth");
 
-// Add customer Form  getData
-// post mthod
+const connectToDb = async () => {
+  return await MongoClient.connect(dburl);
+};
+
+// Customer Routes
 router.post("/postcustomers", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let customer = await db.collection("customer").insertOne(req.body);
-    if (customer) {
-      res.json({
-        statusCode: 200,
-        data: customer,
-        message: "Customer Data Successfully",
-      });
-    }
-  } catch {
+    const db = client.db("inventorybilling");
+    const customer = await db.collection("customer").insertOne(req.body);
     res.json({
+      statusCode: 200,
+      data: customer,
+      message: "Customer Data Successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
-  }
-});
-// get customer
-router.get("/getcustomers", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
-  try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("customer");
-    if (user) {
-      let customer = await db.collection("customer").find().toArray();
-      res.json({ 
-        statusCode: 200,
-        customer,
-        message: "Get Inventory Bill",
-      });
-    }
-  } catch (err) {
-    console.log(err);
+  } finally {
+    client.close();
   }
 });
 
-// Put customer
-router.put("/putcustomers/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+router.get("/getcustomers", async (req, res) => {
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("customer").find().toArray();
+    const db = client.db("inventorybilling");
+    const customers = await db.collection("customer").find().toArray();
+    res.json({ 
+      statusCode: 200,
+      customers,
+      message: "Get Inventory Bill",
+    });
+  } catch (error) {
+    res.status(500).json({
+      statusCode: 500,
+      message: "Internal Server Error",
+    });
+  } finally {
+    client.close();
+  }
+});
+
+router.put("/putcustomers/:id", async (req, res) => {
+  const client = await connectToDb();
+  try {
+    const db = client.db("inventorybilling");
+    const user = await db.collection("customer").find().toArray();
     if (user.length > 0) {
-      let customer = await db
+      const customer = await db
         .collection("customer")
         .updateOne({ _id: ObjectId(req.params.id) }, { $set: { ...req.body } });
       res.json({
@@ -65,27 +64,28 @@ router.put("/putcustomers/:id", async (req, res) => {
         message: "Customer Updated Successfully",
       });
     } else {
-      res.json({
+      res.status(400).json({
         statusCode: 400,
         message: "Invalid User ID",
       });
     }
-  } catch {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Delete Customer Data
 router.delete("/deletecustomer/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("customer").find().toArray();
+    const db = client.db("inventorybilling");
+    const user = await db.collection("customer").find().toArray();
     if (user) {
-      let customer = await db
+      const customer = await db
         .collection("customer")
         .deleteOne({ _id: ObjectId(req.params.id) });
       res.json({
@@ -94,65 +94,64 @@ router.delete("/deletecustomer/:id", async (req, res) => {
         message: "Delete Successfully",
       });
     }
-  } catch (err) {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Delete failed",
     });
-  }
-});
-// ---------------------------------------------------------------------------
-// Product billing information
-//Post Method
-router.post("/postproducts", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
-  try {
-    let db = await client.db("inventorybilling");
-    let product = await db.collection("product").insertOne(req.body);
-    if (product) {
-      res.json({
-        statusCode: 200,
-        data: product,
-        message: "Post Product data successfully",
-      });
-    }
-  } catch (err) {
-    res.json({
-      statusCode: 500,
-      message: "Internal Server Error",
-    });
-  }
-});
-// Get Products method
-router.get("/getproducts", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
-  try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("product");
-    if (user) {
-      let product = await db.collection("product").find().toArray();
-      res.json({
-        statusCode: 200,
-        product,
-        message: "Get Product data successfully",
-      });
-    }
-  } catch (err) {
-    res.json({
-      statusCode: 500,
-      message: "Error getting product",
-    });
+  } finally {
+    client.close();
   }
 });
 
-// Put Method products
-router.put("/putproducts/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+// Product Routes
+router.post("/postproducts", async (req, res) => {
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("product").find().toArray();
+    const db = client.db("inventorybilling");
+    const product = await db.collection("product").insertOne(req.body);
+    res.json({
+      statusCode: 200,
+      data: product,
+      message: "Post Product data successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      statusCode: 500,
+      message: "Internal Server Error",
+    });
+  } finally {
+    client.close();
+  }
+});
+
+router.get("/getproducts", async (req, res) => {
+  const client = await connectToDb();
+  try {
+    const db = client.db("inventorybilling");
+    const products = await db.collection("product").find().toArray();
+    res.json({
+      statusCode: 200,
+      products,
+      message: "Get Product data successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
+      statusCode: 500,
+      message: "Error getting product",
+    });
+  } finally {
+    client.close();
+  }
+});
+
+router.put("/putproducts/:id", async (req, res) => {
+  const client = await connectToDb();
+  try {
+    const db = client.db("inventorybilling");
+    const user = await db.collection("product").find().toArray();
     if (user.length > 0) {
-      let product = await db
+      const product = await db
         .collection("product")
         .updateOne({ _id: ObjectId(req.params.id) }, { $set: { ...req.body } });
       res.json({
@@ -161,27 +160,28 @@ router.put("/putproducts/:id", async (req, res) => {
         message: "Product updated successfully",
       });
     } else {
-      res.json({
+      res.status(400).json({
         statusCode: 400,
         message: "Invalid User ID",
       });
     }
-  } catch (err) {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Delete Product method
 router.delete("/deleteproduct/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("product").find().toArray();
+    const db = client.db("inventorybilling");
+    const user = await db.collection("product").find().toArray();
     if (user) {
-      let product = await db
+      const product = await db
         .collection("product")
         .deleteOne({ _id: ObjectId(req.params.id) });
       res.json({
@@ -190,96 +190,94 @@ router.delete("/deleteproduct/:id", async (req, res) => {
         message: "Delete Successfully",
       });
     }
-  } catch (err) {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
-      message: "Delete failed",
+      message: "Delete Failed",
     });
+  } finally {
+    client.close();
   }
 });
-// -----------------------------------------------------------------------------------
-// Bill information
 
-// Post bill information
+// Bill Information Routes
 router.post("/addbillinformation", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let billinfo = await db.collection("billinformation").insertOne(req.body);
-    if (billinfo) {
-      res.json({
-        statusCode: 200,
-        billinfo,
-        message: "Post Add Bill Information Data Successfully",
-      });
-    }
-  } catch (err) {
+    const db = client.db("inventorybilling");
+    const billinfo = await db.collection("billinformation").insertOne(req.body);
     res.json({
+      statusCode: 200,
+      billinfo,
+      message: "Post Add Bill Information Data Successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-//  Get bill information
 router.get("/getbillinformation", async (req, res) => {
-  const Client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await Client.db("inventorybilling");
-    let user = await db.collection("billinformation");
-    if (user) {
-      let billinfo = await db.collection("billinformation").find().toArray();
-      res.json({
-        statusCode: 200,
-        billinfo,
-        message: "GET Bill Information Data Successfully",
-      });
-    }
-  } catch (err) {
+    const db = client.db("inventorybilling");
+    const billinfo = await db.collection("billinformation").find().toArray();
     res.json({
+      statusCode: 200,
+      billinfo,
+      message: "GET Bill Information Data Successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Put Bill Information
 router.put("/updatebillinfo/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("billinformation").find().toArray();
+    const db = client.db("inventorybilling");
+    const user = await db.collection("billinformation").find().toArray();
     if (user.length > 0) {
-      let bill = await db
+      const bill = await db
         .collection("billinformation")
         .updateOne({ _id: ObjectId(req.params.id) }, { $set: { ...req.body } });
       res.json({
         statusCode: 200,
         bill,
-        message: "Upadate Bill Information Data Successfully",
+        message: "Update Bill Information Data Successfully",
       });
     } else {
-      res.json({
+      res.status(400).json({
         statusCode: 400,
-        message: "Invaild User ID",
+        message: "Invalid User ID",
       });
     }
-  } catch (err) {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Delete Bill Information
 router.delete("/deletebillinfo/:id", async (req, res) => {
-  const Client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await Client.db("inventorybilling");
-    let user = await db.collection("billinformation").find().toArray();
+    const db = client.db("inventorybilling");
+    const user = await db.collection("billinformation").find().toArray();
     if (user) {
-      let billinfo = await db
+      const billinfo = await db
         .collection("billinformation")
         .deleteOne({ _id: ObjectId(req.params.id) });
       res.json({
@@ -288,66 +286,64 @@ router.delete("/deletebillinfo/:id", async (req, res) => {
         message: "Delete Successfully",
       });
     }
-  } catch (err) {
-    res.json({
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Delete Failed",
     });
+  } finally {
+    client.close();
   }
 });
 
-// my profile ----------------------------------------------------------------------------------------
-//  Post My products
+// My Profile Routes
 router.post("/myprofilepost", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let company = await db.collection("myprofile").insertOne(req.body);
-    if (company) {
-      res.json({
-        statusCode: 200,
-        data: company,
-        message: "Post My profile data successfully",
-      });
-    }
-  } catch (err) {
+    const db = client.db("inventorybilling");
+    const company = await db.collection("myprofile").insertOne(req.body);
     res.json({
+      statusCode: 200,
+      data: company,
+      message: "Post My profile data successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Get My profile method
 router.get("/getmyprofile", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("myprofile");
-    if (user) {
-      let profile = await db.collection("myprofile").find().toArray();
-      res.json({
-        statusCode: 200,
-        profile,
-        message: "Get My profile data successfully",
-      });
-    }
-  } catch (err) {
+    const db = client.db("inventorybilling");
+    const profile = await db.collection("myprofile").find().toArray();
     res.json({
+      statusCode: 200,
+      profile,
+      message: "Get My profile data successfully",
+    });
+  } catch (error) {
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
+  } finally {
+    client.close();
   }
 });
 
-// Put Method Myprofile
 router.put("/putmyprofile/:id", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("myprofile").find().toArray();
+    const db = client.db("inventorybilling");
+    const user = await db.collection("myprofile").find().toArray();
     if (user.length > 0) {
-      let product = await db
+      const product = await db
         .collection("myprofile")
         .updateOne({ _id: ObjectId(req.params.id) }, { $set: { ...req.body } });
       res.json({
@@ -356,47 +352,13 @@ router.put("/putmyprofile/:id", async (req, res) => {
         message: "My profile updated successfully",
       });
     } else {
-      res.json({
+      res.status(400).json({
         statusCode: 400,
         message: "Invalid User ID",
       });
     }
-  } catch (err) {
-    res.json({
-      statusCode: 500,
-      message: "Internal Server Error",
-    });
-  }
-});
-
-// --------------------------------------------------
-// signup
-router.post("/signup", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
-  try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("users").find({ email: req.body.email });
-    if (user.length > 0) {
-      res.json({
-        statusCode: 400,
-        message: "User Already Exists",
-      });
-    } else {
-      let hashedPassword = await hashPassword(
-        req.body.password,
-        req.body.cpassword
-      );
-      req.body.password = hashedPassword;
-      req.body.cpassword = hashedPassword;
-      let users = await db.collection("users").insertOne(req.body);
-      res.json({
-        statusCode: 200,
-        message: "User SignUp Successfull",
-      });
-    }
   } catch (error) {
-    console.log(error);
-    res.json({
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
@@ -405,17 +367,46 @@ router.post("/signup", async (req, res) => {
   }
 });
 
-// Login
+// Authentication Routes
+router.post("/signup", async (req, res) => {
+  const client = await connectToDb();
+  try {
+    const db = client.db("inventorybilling");
+    const user = await db.collection("users").findOne({ email: req.body.email });
+    if (user) {
+      res.status(400).json({
+        statusCode: 400,
+        message: "User Already Exists",
+      });
+    } else {
+      const hashedPassword = await hashPassword(req.body.password, req.body.cpassword);
+      req.body.password = hashedPassword;
+      req.body.cpassword = hashedPassword;
+      await db.collection("users").insertOne(req.body);
+      res.json({
+        statusCode: 200,
+        message: "User SignUp Successful",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      statusCode: 500,
+      message: "Internal Server Error",
+    });
+  } finally {
+    client.close();
+  }
+});
 
 router.post("/login", async (req, res) => {
-  const client = await MongoClient.connect(dburl);
+  const client = await connectToDb();
   try {
-    let db = await client.db("inventorybilling");
-    let user = await db.collection("users").findOne({ email: req.body.email });
+    const db = client.db("inventorybilling");
+    const user = await db.collection("users").findOne({ email: req.body.email });
     if (user) {
-      let compare = await hashCompare(req.body.password, user.password);
+      const compare = await hashCompare(req.body.password, user.password);
       if (compare) {
-        let token = await createToken(user.email, user.username);
+        const token = await createToken(user.email, user.username);
         res.json({
           statusCode: 200,
           email: user.email,
@@ -423,19 +414,19 @@ router.post("/login", async (req, res) => {
           token,
         });
       } else {
-        res.json({
+        res.status(400).json({
           statusCode: 400,
           message: "Invalid Password",
         });
       }
     } else {
-      res.json({
+      res.status(404).json({
         statusCode: 404,
         message: "User Not Found",
       });
     }
   } catch (error) {
-    res.json({
+    res.status(500).json({
       statusCode: 500,
       message: "Internal Server Error",
     });
@@ -443,7 +434,7 @@ router.post("/login", async (req, res) => {
     client.close();
   }
 });
-// varify token
+
 router.post("/auth", verifyToken, async (req, res) => {
   res.json({
     statusCode: 200,
