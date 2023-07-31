@@ -1,5 +1,15 @@
-var mongodb = require("mongodb");
-var MongoClient = mongodb.MongoClient;
-var dbName = "inventorybilling";
-var dburl = `mongodb+srv://smitdonda7575:smit7575@cluster0.dlzml.mongodb.net/test${dbName}`;
-module.exports = { mongodb, MongoClient, dburl };
+const { MongoClient } = require("mongodb");
+require("dotenv").config();
+
+var dburl = process.env.MONGO_DB_URL;
+const connectToDb = async () => {
+  try {
+    const client = await MongoClient.connect(dburl);
+    return client;
+  } catch (error) {
+    console.error("Error connecting to the database:", error);
+    throw error;
+  }
+};
+
+module.exports = { connectToDb };

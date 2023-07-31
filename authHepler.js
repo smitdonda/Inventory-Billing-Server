@@ -1,9 +1,10 @@
 var bcrypt = require("bcryptjs");
-var saltRound = 10;
+require("dotenv").config();
 var JWT = require("jsonwebtoken");
 var JWTD = require("jwt-decode");
-var secret = "snksknfjbekjb@nkj*&153";
+var secret = process.env.JWT_SECRET;
 
+var saltRound = 10;
 var hashPassword = async (pwd) => {
   let salt = await bcrypt.genSalt(saltRound);
   let hash = await bcrypt.hash(pwd, salt);
@@ -23,7 +24,7 @@ var createToken = async (email, username) => {
     },
     secret,
     {
-      expiresIn: "3h",
+      expiresIn: process.env.JWT_EXPIRATION_TIME,
     }
   );
   return token;
