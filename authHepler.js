@@ -1,23 +1,24 @@
-var bcrypt = require("bcryptjs");
+const bcrypt = require("bcryptjs");
+const JWT = require("jsonwebtoken");
+const JWTD = require("jwt-decode");
 require("dotenv").config();
-var JWT = require("jsonwebtoken");
-var JWTD = require("jwt-decode");
-var secret = process.env.JWT_SECRET;
 
-var saltRound = 10;
-var hashPassword = async (pwd) => {
-  let salt = await bcrypt.genSalt(saltRound);
-  let hash = await bcrypt.hash(pwd, salt);
+const secret = process.env.JWT_SECRET;
+const saltRound = 10;
+
+const hashPassword = async (pwd) => {
+  const salt = await bcrypt.genSalt(saltRound);
+  const hash = await bcrypt.hash(pwd, salt);
   return hash;
 };
 
-var hashCompare = async (pwd, hash) => {
-  let result = await bcrypt.compare(pwd, hash);
+const hashCompare = async (pwd, hash) => {
+  const result = await bcrypt.compare(pwd, hash);
   return result;
 };
 
-var createToken = async (email, username) => {
-  let token = await JWT.sign(
+const createToken = async (email, username) => {
+  const token = await JWT.sign(
     {
       email,
       username,
@@ -30,14 +31,14 @@ var createToken = async (email, username) => {
   return token;
 };
 
-var verifyToken = async (req, res, next) => {
-  let decodeData = JWTD(req.headers.token);
-  if (new Date() / 1000 < decodeData.exp) {
+const verifyToken = async (req, res, next) => {
+  const decodeData = JWTD(req.headers.token);
+  if (Date.now() < decodeData.exp * 1000) {
     next();
   } else {
     res.json({
-      statusCode: 401,
-      message: "Session Expired Login again!",
+      success: false,
+      message: "Session Expired. Please login again!",
     });
   }
 };

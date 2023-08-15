@@ -20,7 +20,13 @@
     "jsonwebtoken": "^8.5.1",
     "jwt-decode": "^3.1.2",
     "mongodb": "^4.4.1",
+    "mongoose": "^7.4.2",
+    "mongoose-paginate-v2": "^1.7.31",
     "morgan": "~1.9.1",
-    "nodemon": "^2.0.15"
+    "nodemon": "^2.0.15",
+    "passport": "^0.6.0",
+    "passport-jwt": "^4.0.1",
+    "trim-request": "^1.0.6",
+    "validator": "^13.11.0"
   }
 }
