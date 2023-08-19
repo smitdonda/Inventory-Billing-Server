@@ -6,7 +6,7 @@ const {
   hashCompare,
   createToken,
   verifyToken,
-} = require("../authHepler");
+} = require("../utils/authHepler");
 
 // Authentication Routes
 router.post("/signup", async (req, res) => {
@@ -47,17 +47,16 @@ router.post("/login", async (req, res) => {
     if (user) {
       const compare = await hashCompare(req.body.password, user.password);
       if (compare) {
-        const token = await createToken(user.email, user.username);
+        const token = await createToken(user._id);
         res.json({
           success: true,
-          email: user.email,
-          username: user.username,
+          userId: user._id,
           token,
         });
       } else {
         res.status(422).json({
           success: false,
-          message: "wrong Password",
+          message: "Wrong password",
         });
       }
     } else {

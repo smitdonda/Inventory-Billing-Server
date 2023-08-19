@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const Customer = require("../models/customers");
 const { isIDGood } = require("../utils/isIDGood");
+const { requireAuth } = require("../config/requireAuth");
 
 // Customer Routes
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const customer = new Customer(req.body);
     await customer.save();
@@ -24,13 +25,17 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const customers = await Customer.find();
+    const customers = await Customer.find({}).sort({
+      updatedAt: -1,
+      createdAt: -1,
+    });
     res.json({
       success: true,
       customers,
       message: "Get Inventory Bill",
     });
   } catch (error) {
+    console.log(error);
     res.status(500).json({
       success: false,
       message: "Internal Server Error",
@@ -38,7 +43,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
     const customer = await Customer.findByIdAndUpdate(
@@ -75,7 +80,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
     const customer = await Customer.findByIdAndDelete(id);

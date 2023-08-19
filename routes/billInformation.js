@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const BillInformation = require("../models/BilIInfo");
 const { isIDGood } = require("../utils/isIDGood");
+const { requireAuth } = require("../config/requireAuth");
 
 // Bill Information Routes
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const billinfo = new BillInformation(req.body);
     await billinfo.save();
@@ -23,7 +24,10 @@ router.post("/", async (req, res) => {
 
 router.get("/", async (req, res) => {
   try {
-    const billinfo = await BillInformation.find();
+    const billinfo = await BillInformation.find({}).sort({
+      updatedAt: -1,
+      createdAt: -1,
+    });
     res.json({
       success: true,
       billinfo,
@@ -37,7 +41,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
     const bill = await BillInformation.findByIdAndUpdate(id, req.body, {
@@ -71,7 +75,7 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
     const billinfo = await BillInformation.findByIdAndDelete(id);

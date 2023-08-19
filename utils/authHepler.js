@@ -17,11 +17,10 @@ const hashCompare = async (pwd, hash) => {
   return result;
 };
 
-const createToken = async (email, username) => {
+const createToken = async (id) => {
   const token = await JWT.sign(
     {
-      email,
-      username,
+      userId: id,
     },
     secret,
     {

@@ -2,9 +2,10 @@ const express = require("express");
 const router = express.Router();
 const MyProfile = require("../models/myprofile");
 const { isIDGood } = require("../utils/isIDGood");
+const { requireAuth } = require("../config/requireAuth");
 
 // My Profile Routes
-router.post("/", async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const company = new MyProfile(req.body);
     await company.save();
@@ -37,7 +38,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.put("/:id", async (req, res) => {
+router.put("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
     const product = await MyProfile.findByIdAndUpdate(id, req.body, {
