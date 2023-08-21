@@ -11,6 +11,7 @@ const customerRouter = require("./routes/customers");
 const productsRouter = require("./routes/products");
 const billInformationRouter = require("./routes/billInformation");
 const MyProfileRouter = require("./routes/myprofile");
+const DashboardRouter = require("./routes/dashboard");
 const app = express();
 
 // Middleware
@@ -24,6 +25,7 @@ app.use(express.static(path.join(__dirname, "public")));
 // Routes
 app.use(indexRouter);
 app.use(authRouter);
+app.use("/count", DashboardRouter);
 app.use("/customers", customerRouter);
 app.use("/products", productsRouter);
 app.use("/billInformation", billInformationRouter);
