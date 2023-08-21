@@ -8,7 +8,7 @@ const { requireAuth } = require("../config/requireAuth");
 // Bill Information Routes
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const id = await getNextCounterId("Product");
+    const id = await getNextCounterId("BillInformation");
     const billinfo = new BillInformation({ ...req.body, id });
     await billinfo.save();
     res.json({
