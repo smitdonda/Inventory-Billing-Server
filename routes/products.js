@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const Product = require("../models/products");
 const { isIDGood } = require("../utils/isIDGood");
+const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
 
 // Product Routes
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const product = new Product(req.body);
+    const id = await getNextCounterId("Product");
+    const product = new Product({ ...req.body, id });
     await product.save();
     res.json({
       success: true,

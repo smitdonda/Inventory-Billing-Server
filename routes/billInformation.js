@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const BillInformation = require("../models/BilIInfo");
 const { isIDGood } = require("../utils/isIDGood");
+const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
 
 // Bill Information Routes
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const billinfo = new BillInformation(req.body);
+    const id = await getNextCounterId("Product");
+    const billinfo = new BillInformation({ ...req.body, id });
     await billinfo.save();
     res.json({
       success: true,

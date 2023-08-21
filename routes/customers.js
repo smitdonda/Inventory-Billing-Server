@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const Customer = require("../models/customers");
 const { isIDGood } = require("../utils/isIDGood");
+const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
 
 // Customer Routes
 router.post("/", requireAuth, async (req, res) => {
   try {
-    const customer = new Customer(req.body);
+    const id = await getNextCounterId("Customer");
+    const customer = new Customer({ ...req.body, id });
     await customer.save();
     res.json({
       success: true,
