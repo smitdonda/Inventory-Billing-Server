@@ -17,6 +17,7 @@ router.post("/", requireAuth, async (req, res) => {
       message: "Create Bill Information Successfully",
     });
   } catch (error) {
+    console.log("Create Bill Information during errors", error);
     res.status(500).json({
       success: false,
       message: "Internal Server Error",

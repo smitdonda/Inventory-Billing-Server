@@ -23,6 +23,7 @@ const ProductsSchema = new mongoose.Schema(
     },
     products: [
       {
+        id: { type: Number },
         productname: { type: String },
         availableproductqty: { type: Number },
         unitprice: { type: Number },
