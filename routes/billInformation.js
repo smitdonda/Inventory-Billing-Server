@@ -44,6 +44,38 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id", requireAuth, async (req, res) => {
+  try {
+    const id = await isIDGood(req.params.id);
+    const response = await BillInformation.findById(id);
+    if (response) {
+      res.json({
+        success: true,
+        bill: response,
+        message: "Bill Information Updated Successfully",
+      });
+    } else {
+      res.status(404).json({
+        success: false,
+        message: "Not found Bill Information",
+      });
+    }
+  } catch (error) {
+    console.log(error);
+    if (error.message === "Invalid Id") {
+      res.status(422).json({
+        success: false,
+        message: error.message,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Internal Server Error",
+      });
+    }
+  }
+});
+
 router.put("/:id", requireAuth, async (req, res) => {
   try {
     const id = await isIDGood(req.params.id);
