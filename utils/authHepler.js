@@ -1,7 +1,6 @@
 const bcrypt = require("bcryptjs");
 const JWT = require("jsonwebtoken");
 const JWTD = require("jwt-decode");
-require("dotenv").config();
 
 const secret = process.env.JWT_SECRET;
 const saltRound = 10;

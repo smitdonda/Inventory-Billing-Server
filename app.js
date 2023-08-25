@@ -1,10 +1,30 @@
-const createError = require("http-errors");
+require("dotenv").config();
+// const createError = require("http-errors");
 const express = require("express");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
+const helmet = require("helmet");
 const initMongo = require("./config/mongo");
+
+const app = express();
+
+// View engine setup
+app.set("views", path.join(__dirname, "views"));
+app.engine("html", require("ejs").renderFile);
+app.set("view engine", "html");
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(logger("dev"));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+app.use(cookieParser());
+app.use(express.static(path.join(__dirname, "public")));
+
+// Routes
 const indexRouter = require("./routes/index");
 const authRouter = require("./routes/auth");
 const customerRouter = require("./routes/customers");
@@ -12,7 +32,6 @@ const productsRouter = require("./routes/products");
 const billInformationRouter = require("./routes/billInformation");
 const MyProfileRouter = require("./routes/myprofile");
 const DashboardRouter = require("./routes/dashboard");
-const app = express();
 
 // Middleware
 app.use(cors());
@@ -31,9 +50,16 @@ app.use("/products", productsRouter);
 app.use("/billInformation", billInformationRouter);
 app.use("/my-profile", MyProfileRouter);
 
-// Catch 404 and forward to error handler
-app.use((req, res, next) => {
-  next(createError(404));
+/*
+ * Handle 404 error
+ */
+app.use(function (req, res, next) {
+  res.status(404).json({
+    error: {
+      message: "URL_NOT_FOUND",
+    },
+  });
+  // next(createError(404));
 });
 
 // Error handler
