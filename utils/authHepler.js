@@ -1,6 +1,5 @@
 const bcrypt = require("bcryptjs");
 const JWT = require("jsonwebtoken");
-const JWTD = require("jwt-decode");
 
 const secret = process.env.JWT_SECRET;
 const saltRound = 10;
@@ -32,17 +31,5 @@ const createToken = async (id) => {
   return token;
 };
 
-// Write funciton to verifytoken
-const verifyToken = async (req, res, next) => {
-  const decodeData = JWTD(req.headers.token);
-  if (Date.now() < decodeData.exp * 1000) {
-    next();
-  } else {
-    res.json({
-      success: false,
-      message: "Session Expired. Please login again!",
-    });
-  }
-};
 
-module.exports = { hashPassword, hashCompare, createToken, verifyToken };
+module.exports = { hashPassword, hashCompare, createToken };

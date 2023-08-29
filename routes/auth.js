@@ -5,7 +5,6 @@ const {
   hashPassword,
   hashCompare,
   createToken,
-  verifyToken,
 } = require("../utils/authHepler");
 
 // Authentication Routes
@@ -73,11 +72,5 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/auth", verifyToken, async (req, res) => {
-  res.json({
-    success: true,
-    message: req.body.purpose,
-  });
-});
 
 module.exports = router;
