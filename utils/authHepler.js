@@ -28,8 +28,9 @@ const createToken = async (id) => {
       expiresIn: process.env.JWT_EXPIRATION_TIME,
     }
   );
-  return token;
+  const decoded = JWT.verify(token, secret);
+  const expiresIn = new Date(decoded.exp * 1000);
+  return { token, expiresIn };
 };
-
 
 module.exports = { hashPassword, hashCompare, createToken };
