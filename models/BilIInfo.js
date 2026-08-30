@@ -1,38 +1,40 @@
 const mongoose = require("mongoose");
 
-const ProductsSchema = new mongoose.Schema(
+/*
+ * A line item is a snapshot: the name and price are frozen at billing time so
+ * later catalogue edits never rewrite history. `productId` is the live link
+ * back to the catalogue and is what stock adjustments are keyed on.
+ */
+const LineItemSchema = new mongoose.Schema(
   {
-    id: { type: Number, required: true },
-    name: {
-      type: String,
-    },
-    email: {
-      type: String,
-    },
-    phoneNo: {
-      type: String,
-    },
-    date: {
-      type: String,
-    },
-    gstNo: {
-      type: String,
-    },
-    totalproductsprice: {
-      type: Number,
-    },
-    products: [
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: "Products" },
+    id: { type: Number },
+    productname: { type: String, trim: true },
+    unitprice: { type: Number, default: 0 },
+    quantity: { type: Number, default: 0 },
+    pandqtotal: { type: Number, default: 0 },
+    gsttex: { type: Number, default: 0 },
+    gst: [
       {
-        id: { type: Number },
-        productname: { type: String },
-        availableproductqty: { type: Number },
-        unitprice: { type: Number },
-        quantity: { type: Number },
-        gsttex: { type: Number },
-        pandqtotal: { type: Number },
-        gst: { type: Array },
+        _id: false,
+        title: { type: String },
+        value: { type: Number },
+        taxAmount: { type: Number },
       },
     ],
+  },
+  { _id: false }
+);
+
+const BillInfoSchema = new mongoose.Schema(
+  {
+    id: { type: Number, required: true, index: true },
+    name: { type: String, trim: true },
+    email: { type: String, lowercase: true, trim: true },
+    phoneNo: { type: String, trim: true },
+    gstNo: { type: String, trim: true, uppercase: true },
+    totalproductsprice: { type: Number, default: 0 },
+    products: [LineItemSchema],
   },
   {
     versionKey: false,
@@ -40,4 +42,4 @@ const ProductsSchema = new mongoose.Schema(
   }
 );
 
-module.exports = mongoose.model("BillInfo", ProductsSchema);
+module.exports = mongoose.model("BillInfo", BillInfoSchema);

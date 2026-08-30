@@ -5,107 +5,101 @@ const { isIDGood } = require("../utils/isIDGood");
 const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
 
-// Customer Routes
-router.post("/", requireAuth, async (req, res) => {
+// Customer data is business data — every verb needs a signed-in user.
+router.use(requireAuth);
+
+/** Only these fields are writable; `id` is owned by the counter. */
+const pickBody = (body = {}) => ({
+  name: typeof body.name === "string" ? body.name : undefined,
+  email: typeof body.email === "string" ? body.email : undefined,
+  phoneNo: body.phoneNo != null ? String(body.phoneNo) : undefined,
+  gstNo: typeof body.gstNo === "string" ? body.gstNo : undefined,
+});
+
+const clean = (values) =>
+  Object.fromEntries(
+    Object.entries(values).filter(([, value]) => value !== undefined)
+  );
+
+router.post("/", async (req, res, next) => {
   try {
+    const values = clean(pickBody(req.body));
+    if (!values.name) {
+      return res
+        .status(422)
+        .json({ success: false, message: "Customer name is required" });
+    }
+
     const id = await getNextCounterId("Customer");
-    const customer = new Customer({ ...req.body, id });
-    await customer.save();
-    res.json({
+    const customer = await Customer.create({ ...values, id });
+
+    res.status(201).json({
       success: true,
       data: customer,
       message: "Create Customer Successfully",
     });
   } catch (error) {
-    console.log("error creating customer", error.message);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
+    next(error);
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
-    const customers = await Customer.find({}).sort({
-      updatedAt: -1,
-      createdAt: -1,
-    });
+    const customers = await Customer.find({}).sort({ updatedAt: -1, _id: -1 });
     res.json({
       success: true,
       customers,
-      message: "Get Inventory Bill",
+      message: "Get customers",
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
+    next(error);
   }
 });
 
-router.put("/:id", requireAuth, async (req, res) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
     const customer = await Customer.findByIdAndUpdate(
       id,
-      { $set: req.body },
-      { new: true }
+      { $set: clean(pickBody(req.body)) },
+      { new: true, runValidators: true }
     );
 
-    if (customer) {
-      res.status(200).json({
-        success: true,
-        customer,
-        message: "Customer Updated Successfully",
-      });
-    } else {
-      res.status(404).json({
-        success: false,
-        message: "Not Found Customer",
-      });
+    if (!customer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Not Found Customer" });
     }
+
+    res.json({
+      success: true,
+      customer,
+      message: "Customer Updated Successfully",
+    });
   } catch (error) {
-    console.log("error Updated customer", error.message);
-    if (error.message === "Invalid Id") {
-      res.status(422).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-      });
-    }
+    next(error);
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
     const customer = await Customer.findByIdAndDelete(id);
 
-    if (customer) {
-      res.json({
-        success: true,
-        customer,
-        message: "Delete Successfully",
-      });
+    // Without this branch a missing customer left the request hanging.
+    if (!customer) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Not Found Customer" });
     }
+
+    res.json({
+      success: true,
+      customer,
+      message: "Delete Successfully",
+    });
   } catch (error) {
-    if (error.message === "Invalid Id") {
-      res.status(422).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-      });
-    }
+    next(error);
   }
 });
 

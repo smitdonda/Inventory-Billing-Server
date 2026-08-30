@@ -1,40 +1,39 @@
 const mongoose = require("mongoose");
-const DB_URL = process.env.MONGO_DB_URL;
 
 module.exports = () => {
   const connect = async () => {
     mongoose.Promise = global.Promise;
 
     try {
-      await mongoose.connect(DB_URL, {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
-        // useCreateIndex: true,
-        // useFindAndModify: false,
-      });
-
-      let dbStatus = `*    DB Connection: OK\n****************************\n`;
+      // useNewUrlParser / useUnifiedTopology are no-ops in the Mongo driver 4+
+      // that Mongoose 7 ships with, and warn if passed.
+      await mongoose.connect(process.env.MONGO_DB_URL);
 
       console.log("****************************");
       console.log("*    Starting Server");
-      console.log(`*    Port: ${process.env.PORT || 3000}`);
-      console.log(`*    Database: MongoDB`);
-      console.log(dbStatus);
+      console.log(`*    Port: ${process.env.PORT || 5000}`);
+      console.log("*    Database: MongoDB");
+      console.log("*    DB Connection: OK");
+      console.log("****************************");
     } catch (err) {
-      let dbStatus = `*    Error connecting to DB : ${err}\n****************************\n`;
-
-      // Prints initialization
       console.log("****************************");
       console.log("*    Starting Server");
-      console.log(`*    Port: ${process.env.PORT || 3000}`);
-      console.log(`*    Database: MongoDB`);
-      console.log(dbStatus);
+      console.log(`*    Port: ${process.env.PORT || 5000}`);
+      console.log("*    Database: MongoDB");
+      console.log(`*    Error connecting to DB: ${err.message}`);
+      console.log("****************************");
     }
 
-    // Other event listeners
-    mongoose.connection.on("error", console.log);
-    mongoose.connection.on("disconnected", connect);
+    mongoose.connection.on("error", (err) =>
+      console.error("MongoDB error:", err.message)
+    );
   };
+
+  // The driver reconnects on its own; the old "disconnected" -> connect()
+  // listener stacked a fresh connection attempt on every blip.
+  mongoose.connection.on("disconnected", () =>
+    console.warn("MongoDB disconnected — driver will retry")
+  );
 
   connect();
 };

@@ -5,106 +5,119 @@ const { isIDGood } = require("../utils/isIDGood");
 const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
 
-// Product Routes
-router.post("/", requireAuth, async (req, res) => {
+router.use(requireAuth);
+
+/** Whitelist of writable fields — `id` stays under the counter's control. */
+const pickBody = (body = {}) => {
+  const values = {};
+  if (typeof body.productname === "string")
+    values.productname = body.productname;
+  if (body.availableproductqty !== undefined) {
+    values.availableproductqty = Math.trunc(Number(body.availableproductqty));
+  }
+  if (body.unitprice !== undefined) values.unitprice = Number(body.unitprice);
+  return values;
+};
+
+const invalidNumbers = (values) =>
+  Object.entries(values).some(
+    ([key, value]) =>
+      key !== "productname" && (!Number.isFinite(value) || value < 0)
+  );
+
+router.post("/", async (req, res, next) => {
   try {
+    const values = pickBody(req.body);
+    if (!values.productname) {
+      return res
+        .status(422)
+        .json({ success: false, message: "Product name is required" });
+    }
+    if (invalidNumbers(values)) {
+      return res.status(422).json({
+        success: false,
+        message: "Quantity and unit price must be zero or more",
+      });
+    }
+
     const id = await getNextCounterId("Product");
-    const product = new Product({ ...req.body, id });
-    await product.save();
-    res.json({
+    const product = await Product.create({ ...values, id });
+
+    res.status(201).json({
       success: true,
       data: product,
       message: "Create Product successfully",
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Internal Server Error",
-    });
+    next(error);
   }
 });
 
-router.get("/", async (req, res) => {
+router.get("/", async (req, res, next) => {
   try {
-    const products = await Product.find({}).sort({
-      updatedAt: -1,
-      createdAt: -1,
-    });
+    const products = await Product.find({}).sort({ updatedAt: -1, _id: -1 });
     res.json({
       success: true,
       products,
       message: "Get Product data successfully",
     });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "Error getting product",
-    });
+    next(error);
   }
 });
 
-router.put("/:id", requireAuth, async (req, res) => {
+router.put("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
-    const product = await Product.findByIdAndUpdate(id, req.body, {
-      new: true,
-    });
+    const values = pickBody(req.body);
 
-    if (product) {
-      res.json({
-        success: true,
-        product,
-        message: "Product updated successfully",
-      });
-    } else {
-      res.status(404).json({
+    if (invalidNumbers(values)) {
+      return res.status(422).json({
         success: false,
-        message: "Not found product",
+        message: "Quantity and unit price must be zero or more",
       });
     }
+
+    const product = await Product.findByIdAndUpdate(
+      id,
+      { $set: values },
+      { new: true, runValidators: true }
+    );
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Not found product" });
+    }
+
+    res.json({
+      success: true,
+      product,
+      message: "Product updated successfully",
+    });
   } catch (error) {
-    if (error.message === "Invalid Id") {
-      res.status(422).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-      });
-    }
+    next(error);
   }
 });
 
-router.delete("/:id", requireAuth, async (req, res) => {
+router.delete("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
     const product = await Product.findByIdAndDelete(id);
-    if (product) {
-      res.json({
-        success: true,
-        product,
-        message: "Delete Successfully",
-      });
-    } else {
-      res.status(400).json({
-        success: false,
-        message: "Invalid Product ID",
-      });
+
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Not found product" });
     }
+
+    res.json({
+      success: true,
+      product,
+      message: "Delete Successfully",
+    });
   } catch (error) {
-    if (error.message === "Invalid Id") {
-      res.status(422).json({
-        success: false,
-        message: error.message,
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Internal Server Error",
-      });
-    }
+    next(error);
   }
 });
 

@@ -3,13 +3,17 @@ const User = require("../models/users");
 
 const requireAuth = async (req, res, next) => {
   try {
-    const token = req.headers?.authorization?.replace("Bearer ", "").trim();
+    const header = req.headers?.authorization || "";
+    const token = header.startsWith("Bearer ")
+      ? header.slice(7).trim()
+      : header.trim();
+
     if (!token) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
     }
 
-    const decode = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decode.userId);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await User.findById(decoded.userId);
 
     if (!user) {
       return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -18,19 +22,17 @@ const requireAuth = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
-    if (error.name === "JsonWebTokenError") {
-      return res.status(401).json({ success: false, message: "Unauthorized" });
-    } else if (error.name === "TokenExpiredError") {
+    if (error.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
         message: "Session expired, please sign in again",
       });
-    } else {
-      console.log(error);
-      return res
-        .status(500)
-        .json({ success: false, message: "Internal server error" });
     }
+    if (error.name === "JsonWebTokenError" || error.name === "NotBeforeError") {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+    return next(error);
   }
 };
+
 module.exports = { requireAuth };
