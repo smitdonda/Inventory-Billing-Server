@@ -1,15 +1,17 @@
-node_modules/
 
-# Secrets — never commit these
-.env
-.env.local
-.env.*.local
-
-# Logs
-npm-debug.log*
-*.log
 
 # Editors / OS
+# Logs
+# Secrets — never commit these
+*.log
 .DS_Store
-.vscode/
+.env
+.env*
+.env.*.local
+.env.local
 .idea/
+.vercel
+.vercel
+.vscode/
+node_modules/
+npm-debug.log*
