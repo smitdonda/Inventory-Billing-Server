@@ -41,10 +41,16 @@ app.use(
   cors(
     allowedOrigins.length
       ? {
-          origin: (origin, callback) =>
-            !origin || allowedOrigins.includes(origin)
-              ? callback(null, true)
-              : callback(new Error("Not allowed by CORS")),
+          origin: (origin, callback) => {
+            if (!origin || allowedOrigins.includes(origin)) {
+              return callback(null, true);
+            }
+            // Carry a status, or the handler below logs a rejected origin as
+            // a 500 and any passer-by can fill the logs with stack traces.
+            const error = new Error("Not allowed by CORS");
+            error.status = 403;
+            return callback(error);
+          },
         }
       : undefined
   )
