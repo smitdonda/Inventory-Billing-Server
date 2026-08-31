@@ -6,8 +6,20 @@ const {
   hashCompare,
   createToken,
 } = require("../utils/authHepler");
+const {
+  keysFor,
+  checkLimit,
+  recordFailure,
+  clearAttempts,
+} = require("../config/loginLimiter");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Same shape for both throttled routes: 429 plus how long to wait. */
+const tooManyAttempts = (res, retryAfter, message) => {
+  res.set("Retry-After", String(retryAfter));
+  return res.status(429).json({ success: false, message });
+};
 
 router.post("/signup", async (req, res, next) => {
   try {
@@ -16,6 +28,22 @@ router.post("/signup", async (req, res, next) => {
       .toLowerCase();
     const password = String(req.body.password || "");
     const username = String(req.body.username || "").trim();
+
+    // Throttled on the address alone: creating accounts is the thing being
+    // limited here, so every attempt counts, not only the failures.
+    const throttleKeys = keysFor(req).map(({ key, limit }) => ({
+      key: `signup:${key}`,
+      limit,
+    }));
+    const { blocked, retryAfter } = await checkLimit(throttleKeys);
+    if (blocked) {
+      return tooManyAttempts(
+        res,
+        retryAfter,
+        `Too many sign-ups from this address. Try again in ${Math.ceil(retryAfter / 60)} minutes.`
+      );
+    }
+    await recordFailure(throttleKeys);
 
     if (!EMAIL_RE.test(email)) {
       return res
@@ -69,6 +97,18 @@ router.post("/login", async (req, res, next) => {
       .toLowerCase();
     const password = String(req.body.password || "");
 
+    // Budget is spent per email and per address. Checked before the password
+    // is ever compared, so a locked-out guesser gets no timing signal either.
+    const throttleKeys = keysFor(req, email);
+    const { blocked, retryAfter } = await checkLimit(throttleKeys);
+    if (blocked) {
+      return tooManyAttempts(
+        res,
+        retryAfter,
+        `Too many failed attempts. Try again in ${Math.ceil(retryAfter / 60)} minutes.`
+      );
+    }
+
     // `password` is `select: false` on the model, so ask for it explicitly.
     const user = await User.findOne({ email }).select("+password");
 
@@ -76,10 +116,14 @@ router.post("/login", async (req, res, next) => {
     // apart lets an attacker enumerate which emails are registered.
     const ok = user ? await hashCompare(password, user.password) : false;
     if (!ok) {
+      await recordFailure(throttleKeys);
       return res
         .status(401)
         .json({ success: false, message: "Invalid email or password" });
     }
+
+    // Proving the password clears the lockout for this email and address.
+    await clearAttempts(throttleKeys);
 
     const { token, expiresIn } = await createToken(user._id);
 

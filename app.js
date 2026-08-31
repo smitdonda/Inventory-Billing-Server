@@ -17,6 +17,11 @@ const initMongo = require("./config/mongo");
 
 const app = express();
 
+// Vercel terminates TLS and proxies one hop, so the socket address is theirs,
+// not the caller's. Trusting that single hop is what makes req.ip and the
+// login throttle read the real client address.
+app.set("trust proxy", 1);
+
 // View engine setup
 app.set("views", path.join(__dirname, "views"));
 app.engine("html", require("ejs").renderFile);
