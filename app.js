@@ -1,4 +1,6 @@
-require("dotenv").config();
+// quiet: dotenv 17 otherwise prints a promo banner into the server logs on
+// every cold start.
+require("dotenv").config({ quiet: true });
 const express = require("express");
 const path = require("path");
 const cookieParser = require("cookie-parser");
