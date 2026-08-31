@@ -12,6 +12,7 @@ const {
   recordFailure,
   clearAttempts,
 } = require("../config/loginLimiter");
+const { resolveUser } = require("../config/requireAuth");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -44,6 +45,26 @@ router.post("/signup", async (req, res, next) => {
       );
     }
     await recordFailure(throttleKeys);
+
+    /*
+     * Accounts are not self-service. Every account sees the same customers,
+     * products and bills, so handing one out is handing over the whole book —
+     * an open /signup let anyone on the internet read it.
+     *
+     * The exception is the very first account on a fresh install: there is
+     * nobody yet who could authorise it. After that, only someone already
+     * signed in may create an account.
+     */
+    if ((await User.estimatedDocumentCount()) > 0) {
+      const invitedBy = await resolveUser(req);
+      if (!invitedBy) {
+        return res.status(401).json({
+          success: false,
+          message:
+            "Sign-ups are closed. Ask someone with an account to create yours.",
+        });
+      }
+    }
 
     if (!EMAIL_RE.test(email)) {
       return res
