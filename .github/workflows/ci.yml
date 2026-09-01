@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # So a red main can be re-checked without an empty commit.
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      # One version failing should not hide the result on the other.
+      fail-fast: false
+      matrix:
+        # package.json declares >=20. Both ends of that range get checked.
+        node: ["20.x", "22.x"]
+
+    env:
+      # The route tests boot a real mongod. Keeping the binary on a path of our
+      # own is what makes it cacheable between runs.
+      MONGOMS_DOWNLOAD_DIR: ${{ github.workspace }}/.cache/mongodb-binaries
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Cache the mongod the route tests run against
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.cache/mongodb-binaries
+          key: mongodb-binaries-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: mongodb-binaries-${{ runner.os }}-
+
+      # ci, not install: it installs exactly the lockfile and fails loudly if
+      # package.json and the lock have drifted apart.
+      - run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      # Unit tests plus the route tests, which drive the real app against an
+      # in-memory MongoDB.
+      - name: Run tests
+        run: npm test
