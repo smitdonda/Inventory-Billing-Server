@@ -1,0 +1,18 @@
+# What must never travel to Vercel in a deployment bundle.
+#
+# Configuration reaches the deployment through Vercel's own environment
+# variables, so a local .env has no business being uploaded — it holds the
+# live database credentials.
+.env
+.env.*
+.env.local
+
+# Local database dumps. These contain password hashes.
+backups/
+
+# Not needed to serve a request, and every megabyte is cold-start weight.
+test/
+test-helpers/
+scripts/
+node_modules/
+.git/
