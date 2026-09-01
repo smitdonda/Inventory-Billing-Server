@@ -9,6 +9,8 @@
     "start": "node ./bin/www",
     "dev": "nodemon ./bin/www",
     "test": "node --test",
+    "lint": "eslint .",
+    "deadcode": "node scripts/find-dead-code.js",
     "migrate:owner": "node scripts/migrate-assign-owner.js",
     "migrate:money": "node scripts/migrate-money-to-paise.js",
     "format": "prettier --write .",
@@ -27,6 +29,8 @@
     "morgan": "^1.12.0"
   },
   "devDependencies": {
+    "eslint": "^9.39.5",
+    "globals": "^17.12.0",
     "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.14",
     "prettier": "^3.4.2",

@@ -167,21 +167,18 @@ const applyStockDelta = async (delta, userId) => {
           }
         : { _id: productId, user: userId };
 
-    // eslint-disable-next-line no-await-in-loop
     const result = await Product.updateOne(filter, {
       $inc: { availableproductqty: -consume },
     });
 
     if (result.matchedCount === 0) {
       for (const [doneId, doneQty] of applied) {
-        // eslint-disable-next-line no-await-in-loop
         await Product.updateOne(
           { _id: doneId, user: userId },
           { $inc: { availableproductqty: doneQty } }
         );
       }
 
-      // eslint-disable-next-line no-await-in-loop
       const product = await Product.findOne({ _id: productId, user: userId })
         .select("productname availableproductqty")
         .lean();

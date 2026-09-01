@@ -50,4 +50,4 @@ const requireAuth = async (req, res, next) => {
   }
 };
 
-module.exports = { requireAuth, readToken };
+module.exports = { requireAuth };

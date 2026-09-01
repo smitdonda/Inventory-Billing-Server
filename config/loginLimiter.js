@@ -94,6 +94,4 @@ module.exports = {
   checkLimit,
   recordFailure,
   clearAttempts,
-  WINDOW_MS,
-  LIMITS,
 };

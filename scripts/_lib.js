@@ -65,4 +65,4 @@ const run = async (name, fn) => {
   }
 };
 
-module.exports = { run, connect, alreadyApplied, markApplied };
+module.exports = { run };

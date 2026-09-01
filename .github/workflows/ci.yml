@@ -46,6 +46,11 @@ jobs:
       - name: Check formatting
         run: npm run format:check
 
+      # Mainly here for no-unused-vars: an import left behind by a refactor is
+      # invisible to the tests, which pass just as happily with it there.
+      - name: Lint
+        run: npm run lint
+
       # Unit tests plus the route tests, which drive the real app against an
       # in-memory MongoDB.
       - name: Run tests

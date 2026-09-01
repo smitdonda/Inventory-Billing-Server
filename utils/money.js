@@ -20,14 +20,12 @@ const toPaise = (value) => {
   return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
-/** Rupees (possibly fractional) -> paise. Used by forms and by migrations. */
-const rupeesToPaise = (value) => {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
-};
-
-/** Paise -> rupees, for display or for export. */
-const paiseToRupees = (value) => (Number(value) || 0) / 100;
+/*
+ * Converting between rupees and paise happens at the two edges, and neither
+ * of them is here: the browser does it in Components/ui/format.js when someone
+ * types a price or reads one, and the money migration does it inside MongoDB
+ * as a pipeline. This module never needed a rupee.
+ */
 
 /** A percentage of an amount, rounded to the nearest whole paisa. */
 const percentOf = (amountPaise, percent) => {
@@ -36,4 +34,4 @@ const percentOf = (amountPaise, percent) => {
   return Math.round((amountPaise * pct) / 100);
 };
 
-module.exports = { isPaise, toPaise, rupeesToPaise, paiseToRupees, percentOf };
+module.exports = { isPaise, toPaise, percentOf };
