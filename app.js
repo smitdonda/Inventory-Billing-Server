@@ -3,12 +3,11 @@
 require("dotenv").config({ quiet: true });
 const express = require("express");
 const path = require("path");
-const mongoose = require("mongoose");
 const cookieParser = require("cookie-parser");
 const logger = require("morgan");
 const cors = require("cors");
 const helmet = require("helmet");
-const { requireMongo, isConnected } = require("./config/mongo");
+const { connectMongo, requireMongo, isConnected } = require("./config/mongo");
 
 // Fail at boot rather than at the first login with an unhelpful stack trace.
 ["MONGO_DB_URL", "JWT_SECRET"].forEach((key) => {
@@ -90,18 +89,35 @@ app.use(cookieParser());
 app.use(express.static(path.join(__dirname, "public")));
 
 /*
- * Liveness and readiness in one place, answered before the database gate so it
- * still reports when the database is what is broken.
+ * Liveness and readiness in one place, answered before the database gate so a
+ * broken database is reported rather than hidden behind the gate's generic
+ * "unavailable".
+ *
+ * It connects rather than reading the connection state, because on a cold
+ * serverless instance nothing has connected yet: a passive readyState check
+ * answers "disconnected" for a perfectly healthy deployment, and flaps
+ * depending on which instance happens to take the request.
  */
-app.get("/healthz", (req, res) => {
-  const states = ["disconnected", "connected", "connecting", "disconnecting"];
-  const ready = isConnected();
+app.get("/healthz", async (req, res) => {
+  const started = Date.now();
 
-  res.status(ready ? 200 : 503).json({
-    success: ready,
-    uptime: Math.round(process.uptime()),
-    db: states[mongoose.connection.readyState] || "unknown",
-  });
+  try {
+    await connectMongo();
+    res.json({
+      success: true,
+      uptime: Math.round(process.uptime()),
+      db: isConnected() ? "connected" : "connecting",
+      checkMs: Date.now() - started,
+    });
+  } catch (error) {
+    res.status(503).json({
+      success: false,
+      uptime: Math.round(process.uptime()),
+      db: "unreachable",
+      checkMs: Date.now() - started,
+      message: isProduction ? undefined : error.message,
+    });
+  }
 });
 
 /*
