@@ -8,7 +8,7 @@
   "scripts": {
     "start": "node ./bin/www",
     "dev": "nodemon ./bin/www",
-    "test": "node --test test/",
+    "test": "node --test",
     "migrate:owner": "node scripts/migrate-assign-owner.js",
     "migrate:money": "node scripts/migrate-money-to-paise.js",
     "format": "prettier --write .",
