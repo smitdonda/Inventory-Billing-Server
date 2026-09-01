@@ -1,7 +1,18 @@
 const mongoose = require("mongoose");
 
+/*
+ * The company letterhead printed on invoices. Exactly one per account, which
+ * the unique index on `user` enforces rather than leaving it to the route.
+ */
 const myprofileSchema = new mongoose.Schema(
   {
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      unique: true,
+      index: true,
+    },
     companyname: { type: String, trim: true },
     cemail: { type: String, lowercase: true, trim: true },
     address: { type: String, trim: true },

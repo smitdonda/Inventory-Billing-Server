@@ -2,15 +2,35 @@
 
 const http = require("http");
 const app = require("../app");
+const { connectMongo } = require("../config/mongo");
 
 const port = normalizePort(process.env.PORT || 5000);
 app.set("port", port);
 
 const server = http.createServer(app);
 
-server.listen(port);
-server.on("error", onError);
-server.on("listening", onListening);
+/*
+ * A long-running server has no reason to accept traffic it cannot serve, so
+ * the database connection is proved before the socket opens. The old boot
+ * logged a failed connection and started listening anyway.
+ */
+connectMongo()
+  .then(() => {
+    console.log("****************************");
+    console.log("*    Starting Server");
+    console.log(`*    Port: ${port}`);
+    console.log("*    Database: MongoDB");
+    console.log("*    DB Connection: OK");
+    console.log("****************************");
+
+    server.listen(port);
+    server.on("error", onError);
+    server.on("listening", onListening);
+  })
+  .catch((error) => {
+    console.error(`Could not connect to MongoDB: ${error.message}`);
+    process.exit(1);
+  });
 
 /** A port number, a named pipe, or false when the value makes no sense. */
 function normalizePort(value) {

@@ -15,3 +15,6 @@
 .vscode/
 node_modules/
 npm-debug.log*
+
+# Local DB dumps — these contain password hashes
+backups/

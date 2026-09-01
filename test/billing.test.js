@@ -1,23 +1,12 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-const {
-  round2,
-  priceLine,
-  priceBill,
-  stockDelta,
-} = require("../utils/billing");
+const { priceLine, priceBill, stockDelta } = require("../utils/billing");
 
-/* ------------------------------------------------------------------ */
-/*  round2                                                             */
-/* ------------------------------------------------------------------ */
-
-test("round2 keeps two decimals and kills float drift", () => {
-  assert.equal(round2(1.005), 1.01);
-  assert.equal(round2(0.1 + 0.2), 0.3);
-  assert.equal(round2(7350), 7350);
-  assert.equal(round2(2.675), 2.68);
-});
+/*
+ * Every amount in these tests is in paise: ₹1,000.00 is 100000.
+ * See utils/money.js for why.
+ */
 
 /* ------------------------------------------------------------------ */
 /*  priceLine                                                          */
@@ -26,7 +15,7 @@ test("round2 keeps two decimals and kills float drift", () => {
 test("priceLine applies each slab to the pre-tax subtotal", () => {
   const line = priceLine({
     productname: "Rolex",
-    unitprice: 1000,
+    unitprice: 100000, // ₹1,000.00
     quantity: 7,
     gst: [
       { title: "S GST 2.5%", value: 2.5 },
@@ -34,23 +23,40 @@ test("priceLine applies each slab to the pre-tax subtotal", () => {
     ],
   });
 
-  assert.equal(line.pandqtotal, 7000);
+  assert.equal(line.pandqtotal, 700000); // ₹7,000.00
   assert.deepEqual(
     line.gst.map((slab) => slab.taxAmount),
-    [175, 175]
+    [17500, 17500]
   );
   // Both slabs charge on the subtotal, never on each other.
-  assert.equal(line.gsttex, 7350);
+  assert.equal(line.gsttex, 735000); // ₹7,350.00
+});
+
+test("priceLine keeps every amount a whole number of paise", () => {
+  const line = priceLine({
+    productname: "Odd lot",
+    unitprice: 333,
+    quantity: 3,
+    gst: [{ title: "S GST 9%", value: 9 }],
+  });
+
+  assert.equal(line.pandqtotal, 999);
+  assert.equal(line.gst[0].taxAmount, 90); // 89.91 -> 90
+  assert.equal(line.gsttex, 1089);
+
+  for (const value of [line.unitprice, line.pandqtotal, line.gsttex]) {
+    assert.ok(Number.isInteger(value), `${value} is not whole paise`);
+  }
 });
 
 test("priceLine treats a line with no tax slabs as tax free", () => {
-  const line = priceLine({ productname: "Bag", unitprice: 500, quantity: 2 });
-  assert.equal(line.pandqtotal, 1000);
-  assert.equal(line.gsttex, 1000);
+  const line = priceLine({ productname: "Bag", unitprice: 50000, quantity: 2 });
+  assert.equal(line.pandqtotal, 100000);
+  assert.equal(line.gsttex, 100000);
   assert.deepEqual(line.gst, []);
 });
 
-test("priceLine floors negatives and truncates fractional quantities", () => {
+test("priceLine floors negatives and truncates fractional inputs", () => {
   const line = priceLine({
     productname: "Odd",
     unitprice: -50,
@@ -64,24 +70,34 @@ test("priceLine floors negatives and truncates fractional quantities", () => {
   assert.equal(line.gsttex, 0);
 });
 
+test("priceLine truncates a fractional paisa rather than storing it", () => {
+  const line = priceLine({
+    productname: "Sliver",
+    unitprice: 100.9,
+    quantity: 1,
+  });
+  assert.equal(line.unitprice, 100);
+  assert.equal(line.pandqtotal, 100);
+});
+
 test("priceLine ignores a client-supplied total", () => {
   const line = priceLine({
     productname: "Rolex",
-    unitprice: 100,
+    unitprice: 10000,
     quantity: 1,
-    gsttex: 999999,
-    pandqtotal: 999999,
+    gsttex: 99999900,
+    pandqtotal: 99999900,
   });
 
-  assert.equal(line.pandqtotal, 100);
-  assert.equal(line.gsttex, 100);
+  assert.equal(line.pandqtotal, 10000);
+  assert.equal(line.gsttex, 10000);
 });
 
 test("priceLine drops a productId that is not a valid ObjectId", () => {
   const line = priceLine({
     productId: "not-an-id",
     productname: "Rolex",
-    unitprice: 10,
+    unitprice: 1000,
     quantity: 1,
   });
   assert.equal(line.productId, undefined);
@@ -97,7 +113,7 @@ test("priceBill totals its lines and recomputes the bill total", () => {
     products: [
       {
         productname: "Rolex",
-        unitprice: 1000,
+        unitprice: 100000,
         quantity: 7,
         gst: [
           { title: "S GST 2.5%", value: 2.5 },
@@ -106,7 +122,7 @@ test("priceBill totals its lines and recomputes the bill total", () => {
       },
       {
         productname: "Bag",
-        unitprice: 500,
+        unitprice: 50000,
         quantity: 2,
         gst: [{ title: "S GST 9%", value: 9 }],
       },
@@ -114,15 +130,30 @@ test("priceBill totals its lines and recomputes the bill total", () => {
   });
 
   assert.equal(products.length, 2);
-  assert.equal(totalproductsprice, 7350 + 1090);
+  assert.equal(totalproductsprice, 735000 + 109000);
+  assert.ok(Number.isInteger(totalproductsprice));
+});
+
+test("priceBill stays exact across many small lines", () => {
+  // A hundred lines of ten paise each. In rupees this drifts; in paise it
+  // lands on exactly ₹10.00.
+  const { totalproductsprice } = priceBill({
+    products: Array.from({ length: 100 }, () => ({
+      productname: "Sweet",
+      unitprice: 10,
+      quantity: 1,
+    })),
+  });
+
+  assert.equal(totalproductsprice, 1000);
 });
 
 test("priceBill discards lines with no quantity or no name", () => {
   const { products, totalproductsprice } = priceBill({
     products: [
-      { productname: "Ghost", unitprice: 10, quantity: 0 },
-      { productname: "", unitprice: 10, quantity: 5 },
-      { productname: "Real", unitprice: 10, quantity: 5 },
+      { productname: "Ghost", unitprice: 1000, quantity: 0 },
+      { productname: "", unitprice: 1000, quantity: 5 },
+      { productname: "Real", unitprice: 1000, quantity: 5 },
     ],
   });
 
@@ -130,7 +161,7 @@ test("priceBill discards lines with no quantity or no name", () => {
     products.map((line) => line.productname),
     ["Real"]
   );
-  assert.equal(totalproductsprice, 50);
+  assert.equal(totalproductsprice, 5000);
 });
 
 test("priceBill copes with a missing or non-array products field", () => {

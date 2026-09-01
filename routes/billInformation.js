@@ -10,8 +10,23 @@ const {
   stockDelta,
   applyStockDelta,
 } = require("../utils/billing");
+const {
+  parsePaging,
+  pageMeta,
+  searchFilter,
+  parseSort,
+} = require("../utils/pagination");
 
 router.use(requireAuth);
+
+const SORTABLE = ["id", "name", "totalproductsprice", "createdAt", "updatedAt"];
+const SEARCHABLE = [
+  "name",
+  "email",
+  "phoneNo",
+  "gstNo",
+  "products.productname",
+];
 
 /** Customer details on the bill are a snapshot, separate from line items. */
 const pickCustomer = (body = {}) => {
@@ -25,6 +40,7 @@ const pickCustomer = (body = {}) => {
 
 router.post("/", async (req, res, next) => {
   try {
+    const userId = req.user._id;
     const { products, totalproductsprice } = priceBill(req.body);
     if (!products.length) {
       return res
@@ -33,16 +49,17 @@ router.post("/", async (req, res, next) => {
     }
 
     // Take the stock first: if anything is short the bill is never created.
-    const wanted = await tallyByProduct(products);
-    await applyStockDelta(stockDelta(new Map(), wanted));
+    const wanted = await tallyByProduct(products, userId);
+    await applyStockDelta(stockDelta(new Map(), wanted), userId);
 
     try {
-      const id = await getNextCounterId("BillInformation");
+      const id = await getNextCounterId("BillInformation", userId);
       const billinfo = await BillInformation.create({
         ...pickCustomer(req.body),
         products,
         totalproductsprice,
         id,
+        user: userId,
       });
 
       res.status(201).json({
@@ -52,7 +69,9 @@ router.post("/", async (req, res, next) => {
       });
     } catch (error) {
       // The bill failed to save — hand the stock back.
-      await applyStockDelta(stockDelta(wanted, new Map())).catch(() => {});
+      await applyStockDelta(stockDelta(wanted, new Map()), userId).catch(
+        () => {}
+      );
       throw error;
     }
   } catch (error) {
@@ -62,13 +81,37 @@ router.post("/", async (req, res, next) => {
 
 router.get("/", async (req, res, next) => {
   try {
-    const billinfo = await BillInformation.find({}).sort({
-      createdAt: -1,
-      _id: -1,
-    });
+    const { page, limit, skip } = parsePaging(req.query);
+    const filter = {
+      user: req.user._id,
+      ...(searchFilter(req.query.search, SEARCHABLE) || {}),
+    };
+
+    /*
+     * The billed total is summed in the database over everything the filter
+     * matches, not over the page. The dashboard used to fetch every bill just
+     * to add up this one number in the browser.
+     */
+    const [billinfo, total, totals] = await Promise.all([
+      BillInformation.find(filter)
+        .sort(parseSort(req.query, SORTABLE, { createdAt: -1 }))
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      BillInformation.countDocuments(filter),
+      BillInformation.aggregate([
+        { $match: filter },
+        { $group: { _id: null, billed: { $sum: "$totalproductsprice" } } },
+      ]),
+    ]);
+
     res.json({
       success: true,
       billinfo,
+      meta: {
+        ...pageMeta({ page, limit, total }),
+        totalBilled: totals[0]?.billed || 0,
+      },
       message: "Bill Information Successfully",
     });
   } catch (error) {
@@ -79,7 +122,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
-    const bill = await BillInformation.findById(id);
+    const bill = await BillInformation.findOne({ _id: id, user: req.user._id });
 
     if (!bill) {
       return res
@@ -95,8 +138,9 @@ router.get("/:id", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
+    const userId = req.user._id;
     const id = await isIDGood(req.params.id);
-    const existing = await BillInformation.findById(id);
+    const existing = await BillInformation.findOne({ _id: id, user: userId });
 
     if (!existing) {
       return res
@@ -113,14 +157,14 @@ router.put("/:id", async (req, res, next) => {
 
     // Move stock by the difference only. The old code decremented the full
     // quantity again on every save, so editing a bill drained stock twice.
-    const before = await tallyByProduct(existing.products);
-    const after = await tallyByProduct(products);
+    const before = await tallyByProduct(existing.products, userId);
+    const after = await tallyByProduct(products, userId);
     const delta = stockDelta(before, after);
-    await applyStockDelta(delta);
+    await applyStockDelta(delta, userId);
 
     try {
-      const bill = await BillInformation.findByIdAndUpdate(
-        id,
+      const bill = await BillInformation.findOneAndUpdate(
+        { _id: id, user: userId },
         { $set: { ...pickCustomer(req.body), products, totalproductsprice } },
         { new: true, runValidators: true }
       );
@@ -131,7 +175,7 @@ router.put("/:id", async (req, res, next) => {
         message: "Bill Information Updated Successfully",
       });
     } catch (error) {
-      await applyStockDelta(stockDelta(after, before)).catch(() => {});
+      await applyStockDelta(stockDelta(after, before), userId).catch(() => {});
       throw error;
     }
   } catch (error) {
@@ -141,8 +185,12 @@ router.put("/:id", async (req, res, next) => {
 
 router.delete("/:id", async (req, res, next) => {
   try {
+    const userId = req.user._id;
     const id = await isIDGood(req.params.id);
-    const billinfo = await BillInformation.findByIdAndDelete(id);
+    const billinfo = await BillInformation.findOneAndDelete({
+      _id: id,
+      user: userId,
+    });
 
     if (!billinfo) {
       return res
@@ -151,9 +199,10 @@ router.delete("/:id", async (req, res, next) => {
     }
 
     // Cancelling a bill returns its units to the shelf.
-    const released = await tallyByProduct(billinfo.products);
-    await applyStockDelta(stockDelta(released, new Map())).catch((error) =>
-      console.error("Could not restore stock for bill", id, error.message)
+    const released = await tallyByProduct(billinfo.products, userId);
+    await applyStockDelta(stockDelta(released, new Map()), userId).catch(
+      (error) =>
+        console.error("Could not restore stock for bill", id, error.message)
     );
 
     res.json({

@@ -2,7 +2,13 @@ const mongoose = require("mongoose");
 
 const CustomersSchema = new mongoose.Schema(
   {
-    id: { type: Number, required: true, index: true },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    id: { type: Number, required: true },
     name: {
       type: String,
       trim: true,
@@ -29,5 +35,8 @@ const CustomersSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+CustomersSchema.index({ user: 1, id: 1 }, { unique: true });
+CustomersSchema.index({ user: 1, updatedAt: -1 });
 
 module.exports = mongoose.model("Customers", CustomersSchema);

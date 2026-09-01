@@ -26,8 +26,9 @@ const pickBody = (body = {}) =>
   );
 
 /*
- * The app only ever reads profile[0], so creating a second document would
- * silently strand the data. POST upserts the single company profile instead.
+ * One company profile per account, which the unique index on `user` enforces.
+ * POST upserts it rather than creating a second document the app would never
+ * read.
  */
 router.post("/", async (req, res, next) => {
   try {
@@ -38,14 +39,14 @@ router.post("/", async (req, res, next) => {
         .json({ success: false, message: "Company name is required" });
     }
 
-    const existing = await MyProfile.findOne();
+    const existing = await MyProfile.findOne({ user: req.user._id });
     const profile = existing
-      ? await MyProfile.findByIdAndUpdate(
-          existing._id,
+      ? await MyProfile.findOneAndUpdate(
+          { _id: existing._id, user: req.user._id },
           { $set: values },
           { new: true, runValidators: true }
         )
-      : await MyProfile.create(values);
+      : await MyProfile.create({ ...values, user: req.user._id });
 
     res.status(existing ? 200 : 201).json({
       success: true,
@@ -53,13 +54,27 @@ router.post("/", async (req, res, next) => {
       message: "My profile data saved successfully",
     });
   } catch (error) {
+    // A racing first save trips the unique index on `user`.
+    if (error?.code === 11000) {
+      const profile = await MyProfile.findOneAndUpdate(
+        { user: req.user._id },
+        { $set: pickBody(req.body) },
+        { new: true, runValidators: true }
+      );
+      return res.json({
+        success: true,
+        data: profile,
+        message: "My profile data saved successfully",
+      });
+    }
     next(error);
   }
 });
 
+/* Still an array, because that is the shape the client reads (profile[0]). */
 router.get("/", async (req, res, next) => {
   try {
-    const profile = await MyProfile.find().limit(1);
+    const profile = await MyProfile.find({ user: req.user._id }).limit(1);
     res.json({
       success: true,
       profile,
@@ -73,8 +88,8 @@ router.get("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
-    const profile = await MyProfile.findByIdAndUpdate(
-      id,
+    const profile = await MyProfile.findOneAndUpdate(
+      { _id: id, user: req.user._id },
       { $set: pickBody(req.body) },
       { new: true, runValidators: true }
     );

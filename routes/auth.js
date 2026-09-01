@@ -12,6 +12,12 @@ const {
   recordFailure,
   clearAttempts,
 } = require("../config/loginLimiter");
+const { requireAuth } = require("../config/requireAuth");
+const {
+  TOKEN_COOKIE,
+  sessionCookieOptions,
+  clearCookieOptions,
+} = require("../config/cookie");
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -20,6 +26,14 @@ const tooManyAttempts = (res, retryAfter, message) => {
   res.set("Retry-After", String(retryAfter));
   return res.status(429).json({ success: false, message });
 };
+
+/** The account as the client is allowed to see it. Never includes the token. */
+const publicUser = (user, expiresAt) => ({
+  _id: user._id,
+  username: user.username,
+  email: user.email,
+  ...(expiresAt ? { expiresAt } : {}),
+});
 
 router.post("/signup", async (req, res, next) => {
   try {
@@ -127,19 +141,36 @@ router.post("/login", async (req, res, next) => {
 
     const { token, expiresIn } = await createToken(user._id);
 
+    /*
+     * The token goes in an httpOnly cookie and nowhere else. Handing it to
+     * JavaScript — the old behaviour, stored with js-cookie — meant any
+     * injected script on the page could read a seven-day session and walk off
+     * with it.
+     */
+    res.cookie(TOKEN_COOKIE, token, sessionCookieOptions(expiresIn));
+
     res.json({
       success: true,
-      user: {
-        _id: user._id,
-        username: user.username,
-        email: user.email,
-        expiresAt: expiresIn,
-      },
-      token,
+      user: publicUser(user, expiresIn),
     });
   } catch (error) {
     next(error);
   }
+});
+
+/** Who the cookie belongs to. The client bootstraps its session from this. */
+router.get("/me", requireAuth, (req, res) => {
+  res.json({ success: true, user: publicUser(req.user) });
+});
+
+/*
+ * Logging out has to happen server-side now: the client cannot delete an
+ * httpOnly cookie itself. Always 200 — an expired session logging out is not
+ * an error, and telling the caller otherwise only leaks whether it was valid.
+ */
+router.post("/logout", (req, res) => {
+  res.clearCookie(TOKEN_COOKIE, clearCookieOptions());
+  res.json({ success: true, message: "Signed out" });
 });
 
 module.exports = router;

@@ -4,11 +4,21 @@ const Customer = require("../models/customers");
 const { isIDGood } = require("../utils/isIDGood");
 const { getNextCounterId } = require("../utils/counterId");
 const { requireAuth } = require("../config/requireAuth");
+const {
+  parsePaging,
+  pageMeta,
+  searchFilter,
+  parseSort,
+} = require("../utils/pagination");
 
-// Customer data is business data — every verb needs a signed-in user.
+// Customer data is business data — every verb needs a signed-in user, and
+// every query is scoped to that user's own records.
 router.use(requireAuth);
 
-/** Only these fields are writable; `id` is owned by the counter. */
+const SORTABLE = ["name", "email", "id", "createdAt", "updatedAt"];
+const SEARCHABLE = ["name", "email", "phoneNo", "gstNo"];
+
+/** Only these fields are writable; `id` and `user` are owned by the server. */
 const pickBody = (body = {}) => ({
   name: typeof body.name === "string" ? body.name : undefined,
   email: typeof body.email === "string" ? body.email : undefined,
@@ -30,8 +40,12 @@ router.post("/", async (req, res, next) => {
         .json({ success: false, message: "Customer name is required" });
     }
 
-    const id = await getNextCounterId("Customer");
-    const customer = await Customer.create({ ...values, id });
+    const id = await getNextCounterId("Customer", req.user._id);
+    const customer = await Customer.create({
+      ...values,
+      id,
+      user: req.user._id,
+    });
 
     res.status(201).json({
       success: true,
@@ -45,10 +59,25 @@ router.post("/", async (req, res, next) => {
 
 router.get("/", async (req, res, next) => {
   try {
-    const customers = await Customer.find({}).sort({ updatedAt: -1, _id: -1 });
+    const { page, limit, skip } = parsePaging(req.query);
+    const filter = {
+      user: req.user._id,
+      ...(searchFilter(req.query.search, SEARCHABLE) || {}),
+    };
+
+    const [customers, total] = await Promise.all([
+      Customer.find(filter)
+        .sort(parseSort(req.query, SORTABLE))
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Customer.countDocuments(filter),
+    ]);
+
     res.json({
       success: true,
       customers,
+      meta: pageMeta({ page, limit, total }),
       message: "Get customers",
     });
   } catch (error) {
@@ -59,8 +88,8 @@ router.get("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
-    const customer = await Customer.findByIdAndUpdate(
-      id,
+    const customer = await Customer.findOneAndUpdate(
+      { _id: id, user: req.user._id },
       { $set: clean(pickBody(req.body)) },
       { new: true, runValidators: true }
     );
@@ -84,7 +113,10 @@ router.put("/:id", async (req, res, next) => {
 router.delete("/:id", async (req, res, next) => {
   try {
     const id = await isIDGood(req.params.id);
-    const customer = await Customer.findByIdAndDelete(id);
+    const customer = await Customer.findOneAndDelete({
+      _id: id,
+      user: req.user._id,
+    });
 
     // Without this branch a missing customer left the request hanging.
     if (!customer) {
